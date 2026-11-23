@@ -26,18 +26,39 @@ jobs:
           gradle-version: '8.11.1'
 
       - name: Extract project ZIP
-        run: |
-          unzip -q LikeBoost-Android-Starter.zip -d source
+        run: unzip -q LikeBoost-Android-Starter.zip -d source
 
       - name: Find Android project
         run: |
           PROJECT_DIR=$(find source -name settings.gradle.kts -type f -printf '%h\n' | head -n 1)
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Could not find settings.gradle.kts"
+            echo "Project not found"
             exit 1
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Found project at $PROJECT_DIR"
+
+      - name: Fix Java and Kotlin versions
+        run: |
+          python3 - "$PROJECT_DIR/app/build.gradle.kts" <<'PY'
+          import sys
+          from pathlib import Path
+
+          p = Path(sys.argv[1])
+          s = p.read_text()
+
+          if "compileOptions" not in s:
+              s = s.replace("android {", """android {
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          """, 1)
+
+          p.write_text(s)
+          PY
 
       - name: Build LikeBoost APK
         run: |
@@ -50,3 +71,4 @@ jobs:
           name: LikeBoost-APK
           path: source/**/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
